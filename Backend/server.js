@@ -3,8 +3,6 @@ const mongoose = require('mongoose');
 const multer = require('multer');
 const { GridFsStorage } = require('multer-gridfs-storage');
 const Grid = require('gridfs-stream');
-const fs = require('fs-extra');
-const path = require('path');
 const bodyParser = require('body-parser');
 const morgan = require('morgan');
 const cors = require('cors'); // Import the cors package
@@ -33,17 +31,20 @@ conn.once('open', () => {
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-const TEMP_DIR = path.join(__dirname, 'temp_chunks');
-fs.ensureDirSync(TEMP_DIR);
-console.log(`Temporary directory for chunks created at ${TEMP_DIR}`);
+// In-memory storage for file chunks
+const fileChunks = {};
 
 // Endpoint to handle chunk upload
 app.post('/upload-chunk', upload.single('chunk'), (req, res) => {
   const { filename, chunkIndex } = req.body;
-  const chunkPath = path.join(TEMP_DIR, `${filename}-${chunkIndex}`);
-  fs.writeFileSync(chunkPath, req.file.buffer);
 
-  console.log(`Received chunk ${chunkIndex} for file ${filename}, saved at ${chunkPath}`);
+  if (!fileChunks[filename]) {
+    fileChunks[filename] = [];
+  }
+
+  fileChunks[filename][chunkIndex] = req.file.buffer;
+
+  console.log(`Received chunk ${chunkIndex} for file ${filename}`);
   res.status(200).send('Chunk uploaded');
 });
 
@@ -57,26 +58,21 @@ app.post('/upload-complete', async (req, res) => {
     content_type: 'image/jpeg',
   });
 
-  const chunkFiles = fs.readdirSync(TEMP_DIR).filter((file) => file.startsWith(filename));
-  chunkFiles.sort((a, b) => {
-    const indexA = parseInt(a.split('-').pop(), 10);
-    const indexB = parseInt(b.split('-').pop(), 10);
-    return indexA - indexB;
-  });
+  const chunks = fileChunks[filename];
 
-  console.log(`Merging ${chunkFiles.length} chunks for file ${filename}`);
+  if (!chunks) {
+    return res.status(400).send('No chunks found for this file');
+  }
 
-  for (const chunkFile of chunkFiles) {
-    const chunkPath = path.join(TEMP_DIR, chunkFile);
-    const chunkBuffer = fs.readFileSync(chunkPath);
-    writeStream.write(chunkBuffer);
-    fs.unlinkSync(chunkPath);
-    console.log(`Processed and deleted chunk file ${chunkFile}`);
+  for (const chunk of chunks) {
+    writeStream.write(chunk);
   }
 
   writeStream.end();
+
   writeStream.on('finish', () => {
     console.log(`Upload complete for file ${filename}`);
+    delete fileChunks[filename]; // Clear the in-memory storage for this file
     res.status(200).send('Upload complete');
   });
 
@@ -107,6 +103,7 @@ app.get('/image/:filename', (req, res) => {
 });
 
 const PORT = 5000;
+
 app.listen(PORT, () => {
   console.log(`Server started on http://localhost:${PORT}`);
 });
