@@ -1,7 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const multer = require('multer');
-const { GridFsStorage } = require('multer-gridfs-storage');
 const Grid = require('gridfs-stream');
 const bodyParser = require('body-parser');
 const morgan = require('morgan');
@@ -13,6 +12,7 @@ app.use(morgan('dev')); // Use Morgan for HTTP request logging
 
 // Use cors middleware
 app.use(cors()); // Allow access from any origin
+
 
 // MongoDB connection
 const mongoURI = 'mongodb+srv://devnishmal:Nichuvdr786@nishmalsdev.hgasejj.mongodb.net/image-upload';
@@ -54,6 +54,7 @@ app.post('/upload-complete', async (req, res) => {
   console.log(`Upload complete request received for file ${filename}`);
 
   const writeStream = gfs.createWriteStream({
+    _id: new mongoose.Types.ObjectId(),
     filename: filename,
     content_type: 'image/jpeg',
   });
@@ -103,8 +104,6 @@ app.get('/image/:filename', (req, res) => {
 });
 
 const PORT = 5000;
-
 app.listen(PORT, () => {
   console.log(`Server started on http://localhost:${PORT}`);
 });
-

@@ -33,7 +33,7 @@ function App() {
       formData.append('totalChunks', totalChunks);
 
       try {
-        await axios.post('https://5000-idx-world-fastest-upload-1720199482231.cluster-bs35cdu5w5cuaxdfch3hqqt7zm.cloudworkstations.dev/upload-chunk', formData, {
+        await axios.post('https://world-fastest-upload.vercel.app/upload-chunk', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -64,7 +64,7 @@ function App() {
     }
 
     // Notify the server that all chunks have been uploaded
-    await axios.post('https://5000-idx-world-fastest-upload-1720199482231.cluster-bs35cdu5w5cuaxdfch3hqqt7zm.cloudworkstations.dev/upload-complete', {
+    await axios.post('https://world-fastest-upload.vercel.app/upload-complete', {
       filename: file.name,
     });
   };
