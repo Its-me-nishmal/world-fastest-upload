@@ -12,7 +12,8 @@ app.use(morgan('dev')); // Use Morgan for HTTP request logging
 
 // Use cors middleware
 const corsOptions = {
-  origin: 'https://world-fastest-upload-1l65.vercel.app', // Replace with your front-end origin
+  origin: 'https://world-fastest-upload-1l65.vercel.app', 
+  credentials:true, // Replace with your front-end origin
   optionsSuccessStatus: 200,
 };
 app.use(cors(corsOptions)); // Allow access from any origin
