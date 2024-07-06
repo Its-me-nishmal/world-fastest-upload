@@ -11,7 +11,11 @@ app.use(bodyParser.json());
 app.use(morgan('dev')); // Use Morgan for HTTP request logging
 
 // Use cors middleware
-app.use(cors()); // Allow access from any origin
+const corsOptions = {
+  origin: 'https://world-fastest-upload-1l65.vercel.app', // Replace with your front-end origin
+  optionsSuccessStatus: 200,
+};
+app.use(cors(corsOptions)); // Allow access from any origin
 
 
 // MongoDB connection
