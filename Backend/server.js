@@ -4,24 +4,26 @@ const multer = require('multer');
 const Grid = require('gridfs-stream');
 const bodyParser = require('body-parser');
 const morgan = require('morgan');
-const cors = require('cors'); // Import the cors package
+const cors = require('cors');
 
 const app = express();
 app.use(bodyParser.json());
-app.use(morgan('dev')); // Use Morgan for HTTP request logging
+app.use(morgan('dev'));
 
-// Use cors middleware
+// Use CORS middleware with specific origin
 const corsOptions = {
-  origin: 'https://world-fastest-upload-1l65.vercel.app', 
-  credentials:true, // Replace with your front-end origin
+  origin: 'https://world-fastest-upload-1l65.vercel.app', // Replace with your front-end origin
+  credentials: true,
   optionsSuccessStatus: 200,
 };
-app.use(cors(corsOptions)); // Allow access from any origin
-
+app.use(cors(corsOptions));
 
 // MongoDB connection
 const mongoURI = 'mongodb+srv://devnishmal:Nichuvdr786@nishmalsdev.hgasejj.mongodb.net/image-upload';
-const conn = mongoose.createConnection(mongoURI);
+const conn = mongoose.createConnection(mongoURI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
 
 console.log('Connecting to MongoDB...');
 
@@ -55,13 +57,13 @@ app.post('/upload-chunk', upload.single('chunk'), (req, res) => {
 
 // Endpoint to handle upload completion
 app.post('/upload-complete', async (req, res) => {
-  const { filename } = req.body;
+  const { filename, contentType } = req.body; // Include contentType in the request
   console.log(`Upload complete request received for file ${filename}`);
 
   const writeStream = gfs.createWriteStream({
     _id: new mongoose.Types.ObjectId(),
     filename: filename,
-    content_type: 'image/jpeg',
+    contentType: contentType, // Use the provided contentType
   });
 
   const chunks = fileChunks[filename];
@@ -88,23 +90,19 @@ app.post('/upload-complete', async (req, res) => {
   });
 });
 
-// Endpoint to get the image by filename
-app.get('/image/:filename', (req, res) => {
-  console.log(`Request received to get image ${req.params.filename}`);
+// Endpoint to get the file by filename
+app.get('/file/:filename', (req, res) => {
+  console.log(`Request received to get file ${req.params.filename}`);
   gfs.files.findOne({ filename: req.params.filename }, (err, file) => {
     if (!file || file.length === 0) {
       console.error(`No file found for ${req.params.filename}`);
       return res.status(404).json({ err: 'No file exists' });
     }
 
-    if (file.contentType === 'image/jpeg' || file.contentType === 'image/png') {
-      console.log(`Serving image ${req.params.filename}`);
-      const readstream = gfs.createReadStream(file.filename);
-      readstream.pipe(res);
-    } else {
-      console.error(`File ${req.params.filename} is not an image`);
-      res.status(404).json({ err: 'Not an image' });
-    }
+    // Set appropriate content type
+    res.set('Content-Type', file.contentType);
+    const readstream = gfs.createReadStream(file.filename);
+    readstream.pipe(res);
   });
 });
 
