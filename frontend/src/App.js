@@ -4,6 +4,7 @@ import axios from 'axios';
 function App() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0); // State to track upload progress
+  const [uploadedFileUrl, setUploadedFileUrl] = useState(''); // State to store the uploaded file URL
 
   const CHUNK_SIZE = 256 * 1024; // 256KB per chunk
   const MAX_PARALLEL_UPLOADS = 4; // Number of parallel uploads
@@ -75,12 +76,20 @@ function App() {
       filename: file.name,
       contentType: contentType, // Include contentType in the request
     });
+
+    // Set the uploaded file URL
+    setUploadedFileUrl(`https://world-fastest-upload.vercel.app/file/${file.name}`);
   };
 
   return (
     <div className="App">
       <input type="file" onChange={handleFileChange} />
       {selectedFile && <p>Upload Progress: {uploadProgress.toFixed(2)}%</p>}
+      {uploadedFileUrl && (
+        <p>
+          File uploaded! Access it <a href={uploadedFileUrl} target="_blank" rel="noopener noreferrer">here</a>.
+        </p>
+      )}
     </div>
   );
 }
