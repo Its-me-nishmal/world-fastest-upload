@@ -1,10 +1,10 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const multer = require('multer');
-const Grid = require('gridfs-stream');
 const bodyParser = require('body-parser');
 const morgan = require('morgan');
 const cors = require('cors');
+const { GridFSBucket } = require('mongodb');
 
 const app = express();
 app.use(bodyParser.json());
@@ -20,20 +20,24 @@ app.use(cors(corsOptions));
 
 // MongoDB connection
 const mongoURI = 'mongodb+srv://devnishmal:Nichuvdr786@nishmalsdev.hgasejj.mongodb.net/image-upload';
-const conn = mongoose.createConnection(mongoURI, {
+mongoose.connect(mongoURI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
   serverSelectionTimeoutMS: 50000,
 });
 
-console.log('Connecting to MongoDB...');
+const conn = mongoose.connection;
 
-// Initialize GridFS
-let gfs;
 conn.once('open', () => {
-  gfs = Grid(conn.db, mongoose.mongo);
-  gfs.collection('uploads');
-  console.log('Connected to MongoDB and GridFS initialized.');
+  console.log('Connected to MongoDB');
+});
+
+// Initialize GridFSBucket
+let gfsBucket;
+conn.once('open', () => {
+  gfsBucket = new GridFSBucket(conn.db, {
+    bucketName: 'uploads',
+  });
 });
 
 const storage = multer.memoryStorage();
@@ -61,31 +65,29 @@ app.post('/upload-complete', async (req, res) => {
   const { filename, contentType } = req.body; // Include contentType in the request
   console.log(`Upload complete request received for file ${filename}`);
 
-  const writeStream = gfs.createWriteStream({
-    _id: new mongoose.Types.ObjectId(),
-    filename: filename,
-    contentType: contentType, // Use the provided contentType
-  });
-
   const chunks = fileChunks[filename];
 
   if (!chunks) {
     return res.status(400).send('No chunks found for this file');
   }
 
+  const uploadStream = gfsBucket.openUploadStream(filename, {
+    contentType: contentType, // Use the provided contentType
+  });
+
   for (const chunk of chunks) {
-    writeStream.write(chunk);
+    uploadStream.write(chunk);
   }
 
-  writeStream.end();
+  uploadStream.end();
 
-  writeStream.on('finish', () => {
+  uploadStream.on('finish', () => {
     console.log(`Upload complete for file ${filename}`);
     delete fileChunks[filename]; // Clear the in-memory storage for this file
     res.status(200).send('Upload complete');
   });
 
-  writeStream.on('error', (err) => {
+  uploadStream.on('error', (err) => {
     console.error(`Error writing file ${filename}:`, err);
     res.status(500).json({ err });
   });
@@ -94,17 +96,34 @@ app.post('/upload-complete', async (req, res) => {
 // Endpoint to get the file by filename
 app.get('/file/:filename', (req, res) => {
   console.log(`Request received to get file ${req.params.filename}`);
-  gfs.files.findOne({ filename: req.params.filename }, (err, file) => {
-    if (!file || file.length === 0) {
+  gfsBucket.find({ filename: req.params.filename }).toArray((err, files) => {
+    if (!files || files.length === 0) {
       console.error(`No file found for ${req.params.filename}`);
       return res.status(404).json({ err: 'No file exists' });
     }
 
+    const file = files[0];
     // Set appropriate content type
     res.set('Content-Type', file.contentType);
-    const readstream = gfs.createReadStream(file.filename);
+    const readstream = gfsBucket.openDownloadStreamByName(req.params.filename);
     readstream.pipe(res);
   });
+});
+
+// Endpoint to clear all GridFS data
+app.get('/clear-gridfs', async (req, res) => {
+  try {
+    const files = await gfsBucket.find().toArray();
+    for (const file of files) {
+      await gfsBucket.delete(file._id);
+    }
+
+    console.log('All GridFS data cleared.');
+    res.status(200).send('All GridFS data cleared');
+  } catch (error) {
+    console.error('Error clearing GridFS data:', error);
+    res.status(500).send('Error clearing GridFS data');
+  }
 });
 
 const PORT = 5000;
